@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "19649144537",
+    "project_id": "farmacianotificaciones-5dd81",
+    "storage_bucket": "farmacianotificaciones-5dd81.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:19649144537:android:8212c21259358197d500c8",
+        "android_client_info": {
+          "package_name": "com.example.farmacia_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB9kwD-kZhG-qshYSIN2CDfn4y4Oh1k5o8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

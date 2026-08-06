@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Next.js build outputs
+.next/
+**/.next/
+out/
+
+# Flutter build outputs
+.dart_tool/
+**/.dart_tool/
+build/
+**/build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Environment & logs
+.env
+.env.local
+*.log
+
+# IDE & OS
+.DS_Store
+.vscode/
+.idea/
+*.iml
