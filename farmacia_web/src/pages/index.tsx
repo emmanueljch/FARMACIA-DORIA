@@ -128,6 +128,8 @@ export default function FarmaciaPro() {
             folio,
             vendedor_id: sessionActual?.userId ?? null,
             total: Number(venta.total || 0),
+            ganancia: Number(venta.ganancia || 0),
+            costo: Number(venta.costo || 0),
             metodo_pago: venta.metodo_pago ?? 'Efectivo',
             fecha: venta.fecha,
         };
@@ -799,30 +801,16 @@ export default function FarmaciaPro() {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {productos
-                                .filter(p => {
-                                    if (!busqueda.trim()) return true;
-                                    const q = busqueda.trim().toLowerCase();
-                                    return (
-                                        (p.nombre || '').toLowerCase().includes(q) ||
-                                        (p.ref || '').toLowerCase().includes(q)
-                                    );
-                                })
-                                .map(p => (
-                                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
-                                        <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
-                                        <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
-                                        <td className="p-4 font-black">${Number(p.precio_con_impuesto).toFixed(2)}</td>
-                                        <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
-                                    </tr>
-                                ))
-                            }
-                            {productos.filter(p => {
-                                if (!busqueda.trim()) return true;
-                                const q = busqueda.trim().toLowerCase();
-                                return (p.nombre || '').toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q);
-                            }).length === 0 && busqueda.trim() && (
+                            {productosFiltrados.map(p => (
+                                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                    <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
+                                    <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
+                                    <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
+                                    <td className="p-4 font-black">${Number(p.precio_con_impuesto).toFixed(2)}</td>
+                                    <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
+                                </tr>
+                            ))}
+                            {productosFiltrados.length === 0 && busqueda.trim() && (
                                 <tr>
                                     <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
                                         Sin resultados para <strong>"{busqueda}"</strong>
@@ -1149,22 +1137,7 @@ export default function FarmaciaPro() {
                                                 </table>
                                             </div>
                                         )}
-                                                        <tr className="text-slate-800 font-black">
-                                                            <td className="py-4 px-4" colSpan={2}>TOTAL</td>
-                                                            <td className="py-4 px-4 text-right">${costoTotalHoy.toFixed(2)}</td>
-                                                            <td className="py-4 px-4 text-right">${totalFacturadoHoy.toFixed(2)}</td>
-                                                            <td className="py-4 px-4 text-right text-emerald-600">${gananciaHoy.toFixed(2)}</td>
-                                                            <td className={`py-4 px-4 text-right ${porcentajeGananciaHoy > 50 ? 'text-emerald-600' : porcentajeGananciaHoy > 30 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                                                {porcentajeGananciaHoy.toFixed(1)}%
-                                                            </td>
-                                                            <td className="py-4 px-4 text-center">{ventasHoy.length}</td>
-                                                            <td className="py-4 px-4 text-center">-</td>
-                                                        </tr>
-                                                    </tfoot>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
+                                     </div>
                                 </div>
                             </div>
                         )
