@@ -37,6 +37,7 @@ export default function FarmaciaPro() {
     const [cargaMasivaMsg, setCargaMasivaMsg] = useState<string | null>(null);
 
     const [ventas, setVentas] = useState<any[]>([]);
+    const [filtroPeriodoReporte, setFiltroPeriodoReporte] = useState<'todas' | 'hoy' | '7dias' | 'mes'>('todas');
     const [lastSale, setLastSale] = useState<any | null>(null);
     const [mostrarTicketPreview, setMostrarTicketPreview] = useState(false);
     const ticketRef = useRef<HTMLDivElement | null>(null);
@@ -52,14 +53,14 @@ export default function FarmaciaPro() {
 
             if (error) throw error;
 
-            if (data && data.length > 0) {
+            if (data) {
                 const ventasFormateadas = data.map((v: any) => {
                     const detalles = Array.isArray(v.detalle_ventas) ? v.detalle_ventas : [];
                     const productosFormateados = detalles.map((d: any) => {
                         const prod = d.productos || {};
                         const cantidad = Number(d.cantidad || 0);
-                        const precioUnitario = Number(d.precio_unitario || prod.precio_con_impuesto || 0);
-                        const costo = Number(prod.costo || prod.precio || 0);
+                        const precioUnitario = Number(d.precio_unitario || prod.precio_con_impuesto || prod.precio || 0);
+                        const costo = Number(prod.costo || 0);
 
                         return {
                             id: d.producto_id || prod.id,
@@ -98,6 +99,9 @@ export default function FarmaciaPro() {
                 });
 
                 setVentas(ventasFormateadas);
+                if (ventasFormateadas.length > 0) {
+                    setLastSale(normalizarVentaPreview(ventasFormateadas[0]));
+                }
                 window.localStorage.setItem('farmacia_ventas', JSON.stringify(ventasFormateadas));
                 return;
             }
@@ -254,6 +258,33 @@ export default function FarmaciaPro() {
         return ventas.filter((venta) => new Date(venta.fecha).toDateString() === hoy);
     }, [ventas]);
 
+    const ventasFiltradasReporte = useMemo(() => {
+        const ahora = new Date();
+        const hoyStr = ahora.toDateString();
+
+        if (filtroPeriodoReporte === 'hoy') {
+            return ventas.filter((venta) => new Date(venta.fecha).toDateString() === hoyStr);
+        }
+        if (filtroPeriodoReporte === '7dias') {
+            const limite = new Date();
+            limite.setDate(ahora.getDate() - 7);
+            return ventas.filter((venta) => new Date(venta.fecha) >= limite);
+        }
+        if (filtroPeriodoReporte === 'mes') {
+            const inicioMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1);
+            return ventas.filter((venta) => new Date(venta.fecha) >= inicioMes);
+        }
+        return ventas;
+    }, [ventas, filtroPeriodoReporte]);
+
+    const totalFacturadoReporte = useMemo(() => ventasFiltradasReporte.reduce((sum, venta) => sum + Number(venta.total || 0), 0), [ventasFiltradasReporte]);
+    const gananciaReporte = useMemo(() => ventasFiltradasReporte.reduce((sum, venta) => sum + Number(venta.ganancia || 0), 0), [ventasFiltradasReporte]);
+    const costoTotalReporte = useMemo(() => totalFacturadoReporte - gananciaReporte, [totalFacturadoReporte, gananciaReporte]);
+    const porcentajeGananciaReporte = useMemo(() => {
+        if (totalFacturadoReporte === 0) return 0;
+        return (gananciaReporte / totalFacturadoReporte) * 100;
+    }, [gananciaReporte, totalFacturadoReporte]);
+
     const totalFacturadoHoy = useMemo(() => ventasHoy.reduce((sum, venta) => sum + Number(venta.total || 0), 0), [ventasHoy]);
     const gananciaHoy = useMemo(() => ventasHoy.reduce((sum, venta) => sum + Number(venta.ganancia || 0), 0), [ventasHoy]);
     const ventasSemanales = useMemo(() => {
@@ -284,7 +315,6 @@ export default function FarmaciaPro() {
     // Calcular porcentaje de ganancia de hoy
     const porcentajeGananciaHoy = useMemo(() => {
         if (totalFacturadoHoy === 0) return 0;
-        // Porcentaje = (Ganancia / Total Facturado) * 100
         return (gananciaHoy / totalFacturadoHoy) * 100;
     }, [gananciaHoy, totalFacturadoHoy]);
 
@@ -769,15 +799,36 @@ export default function FarmaciaPro() {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {productos.map(p => (
-                                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
-                                    <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
-                                    <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
-                                    <td className="p-4 font-black">${Number(p.precio_con_impuesto).toFixed(2)}</td>
-                                    <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
+                            {productos
+                                .filter(p => {
+                                    if (!busqueda.trim()) return true;
+                                    const q = busqueda.trim().toLowerCase();
+                                    return (
+                                        (p.nombre || '').toLowerCase().includes(q) ||
+                                        (p.ref || '').toLowerCase().includes(q)
+                                    );
+                                })
+                                .map(p => (
+                                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
+                                        <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
+                                        <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
+                                        <td className="p-4 font-black">${Number(p.precio_con_impuesto).toFixed(2)}</td>
+                                        <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
+                                    </tr>
+                                ))
+                            }
+                            {productos.filter(p => {
+                                if (!busqueda.trim()) return true;
+                                const q = busqueda.trim().toLowerCase();
+                                return (p.nombre || '').toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q);
+                            }).length === 0 && busqueda.trim() && (
+                                <tr>
+                                    <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
+                                        Sin resultados para <strong>"{busqueda}"</strong>
+                                    </td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                 )}
@@ -897,28 +948,68 @@ export default function FarmaciaPro() {
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto min-h-0">
+                                {/* BARRA DE FILTROS DE PERÍODO */}
+                                <div className="flex flex-wrap items-center justify-between gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                                    <div>
+                                        <h3 className="text-lg font-black text-slate-800">Reporte de Ventas</h3>
+                                        <p className="text-xs text-slate-500">Filtra y analiza los datos de ventas registrados</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl text-xs font-bold">
+                                        <button
+                                            type="button"
+                                            onClick={() => setFiltroPeriodoReporte('todas')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${filtroPeriodoReporte === 'todas' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Todas las Ventas ({ventas.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFiltroPeriodoReporte('hoy')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${filtroPeriodoReporte === 'hoy' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Hoy ({ventasHoy.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFiltroPeriodoReporte('7dias')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${filtroPeriodoReporte === '7dias' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Últimos 7 Días
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setFiltroPeriodoReporte('mes')}
+                                            className={`px-4 py-2 rounded-lg transition-all ${filtroPeriodoReporte === 'mes' ? 'bg-emerald-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Este Mes
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 pb-8">
                                     <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                        <p className="text-xs font-bold text-slate-400 uppercase">Ventas Hoy</p>
-                                        <h3 className="text-4xl font-black text-emerald-600">${totalFacturadoHoy.toFixed(2)}</h3>
-                                        <p className="mt-3 text-slate-500 text-sm">Ventas registradas: {ventasHoy.length}</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase">
+                                            {filtroPeriodoReporte === 'hoy' ? 'Ventas Hoy' : filtroPeriodoReporte === '7dias' ? 'Ventas 7 Días' : filtroPeriodoReporte === 'mes' ? 'Ventas del Mes' : 'Total Ventas'}
+                                        </p>
+                                        <h3 className="text-4xl font-black text-emerald-600">${totalFacturadoReporte.toFixed(2)}</h3>
+                                        <p className="mt-3 text-slate-500 text-sm">Ventas registradas: {ventasFiltradasReporte.length}</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                        <p className="text-xs font-bold text-slate-400 uppercase">Costo Total Hoy</p>
-                                        <h3 className="text-4xl font-black text-slate-700">${costoTotalHoy.toFixed(2)}</h3>
+                                        <p className="text-xs font-bold text-slate-400 uppercase">Costo Total</p>
+                                        <h3 className="text-4xl font-black text-slate-700">${costoTotalReporte.toFixed(2)}</h3>
                                         <p className="mt-3 text-slate-500 text-sm">Costo de productos vendidos</p>
                                     </div>
                                     <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-                                        <p className="text-xs font-bold text-slate-400 uppercase">Ganancia Hoy</p>
-                                        <h3 className="text-4xl font-black text-emerald-600">${gananciaHoy.toFixed(2)}</h3>
-                                        <p className="mt-3 text-slate-500 text-sm">Ganancia neta del día</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase">Ganancia Total</p>
+                                        <h3 className="text-4xl font-black text-emerald-600">${gananciaReporte.toFixed(2)}</h3>
+                                        <p className="mt-3 text-slate-500 text-sm">Ganancia neta acumulada</p>
                                     </div>
-                                    <div className={`bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 ${porcentajeGananciaHoy > 50 ? 'border-emerald-300 bg-emerald-50' : porcentajeGananciaHoy > 30 ? 'border-yellow-300 bg-yellow-50' : 'border-red-300 bg-red-50'}`}>
-                                        <p className="text-xs font-bold text-slate-400 uppercase">% Ganancia Hoy</p>
-                                        <h3 className={`text-4xl font-black ${porcentajeGananciaHoy > 50 ? 'text-emerald-600' : porcentajeGananciaHoy > 30 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                            {porcentajeGananciaHoy.toFixed(2)}%
+                                    <div className={`bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 ${porcentajeGananciaReporte > 50 ? 'border-emerald-300 bg-emerald-50' : porcentajeGananciaReporte > 30 ? 'border-yellow-300 bg-yellow-50' : 'border-red-300 bg-red-50'}`}>
+                                        <p className="text-xs font-bold text-slate-400 uppercase">% Ganancia</p>
+                                        <h3 className={`text-4xl font-black ${porcentajeGananciaReporte > 50 ? 'text-emerald-600' : porcentajeGananciaReporte > 30 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                            {porcentajeGananciaReporte.toFixed(2)}%
                                         </h3>
-                                        <p className="mt-3 text-slate-500 text-sm">Rentabilidad del día</p>
+                                        <p className="mt-3 text-slate-500 text-sm">Rentabilidad del periodo</p>
                                     </div>
 
                                     <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 xl:col-span-4">
@@ -950,12 +1041,12 @@ export default function FarmaciaPro() {
                                     </div>
 
                                     <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100 xl:col-span-4">
-                                        <p className="text-xs font-bold text-slate-400 uppercase mb-4">Última venta</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase mb-4">Última venta registrada</p>
                                         {lastSale ? (
                                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                 <div>
                                                     <p className="text-xs text-slate-500 mb-1">Folio</p>
-                                                    <p className="text-lg font-black text-slate-800">#{lastSale.id.slice(-6)}</p>
+                                                    <p className="text-lg font-black text-slate-800">#{lastSale.folio || String(lastSale.id).slice(-6)}</p>
                                                 </div>
                                                 <div>
                                                     <p className="text-xs text-slate-500 mb-1">Total</p>
@@ -976,8 +1067,8 @@ export default function FarmaciaPro() {
                                                     </p>
                                                 </div>
                                                 <div>
-                                                    <p className="text-xs text-slate-500 mb-1">Hora</p>
-                                                    <p className="text-lg font-black text-slate-800">{new Date(lastSale.fecha).toLocaleTimeString()}</p>
+                                                    <p className="text-xs text-slate-500 mb-1">Fecha / Hora</p>
+                                                    <p className="text-lg font-black text-slate-800">{new Date(lastSale.fecha).toLocaleString()}</p>
                                                 </div>
                                             </div>
                                         ) : (
@@ -985,18 +1076,23 @@ export default function FarmaciaPro() {
                                         )}
                                     </div>
 
-                                    {/* TABLA DETALLADA DE TODAS LAS VENTAS DEL DÍA */}
+                                    {/* TABLA DETALLADA DE VENTAS FILTRADAS */}
                                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 xl:col-span-4 p-10">
-                                        <h3 className="text-lg font-black text-slate-800 mb-6">Detalles de Todas las Ventas del Día</h3>
-                                        {ventasHoy.length === 0 ? (
-                                            <p className="text-slate-500 text-sm text-center py-8">No hay ventas registradas para hoy</p>
+                                        <div className="flex items-center justify-between mb-6">
+                                            <h3 className="text-lg font-black text-slate-800">
+                                                {filtroPeriodoReporte === 'todas' ? 'Historial Completo de Ventas' : filtroPeriodoReporte === 'hoy' ? 'Ventas de Hoy' : filtroPeriodoReporte === '7dias' ? 'Ventas de los Últimos 7 Días' : 'Ventas de Este Mes'}
+                                            </h3>
+                                            <span className="text-xs text-slate-400 font-bold uppercase">{ventasFiltradasReporte.length} registros</span>
+                                        </div>
+                                        {ventasFiltradasReporte.length === 0 ? (
+                                            <p className="text-slate-500 text-sm text-center py-8">No hay ventas registradas para este periodo.</p>
                                         ) : (
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-sm">
                                                     <thead className="border-b-2 border-slate-200">
                                                         <tr>
                                                             <th className="text-left py-3 px-4 font-black text-slate-600">Folio</th>
-                                                            <th className="text-left py-3 px-4 font-black text-slate-600">Hora</th>
+                                                            <th className="text-left py-3 px-4 font-black text-slate-600">Fecha y Hora</th>
                                                             <th className="text-right py-3 px-4 font-black text-slate-600">Costo</th>
                                                             <th className="text-right py-3 px-4 font-black text-slate-600">Total</th>
                                                             <th className="text-right py-3 px-4 font-black text-slate-600">Ganancia</th>
@@ -1006,14 +1102,14 @@ export default function FarmaciaPro() {
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {ventasHoy.map((venta, idx) => {
+                                                        {ventasFiltradasReporte.map((venta, idx) => {
                                                             const productosVenta = Array.isArray(venta.productos) ? venta.productos : [];
                                                             const ventaPreview = normalizarVentaPreview(venta, idx);
 
                                                             return (
                                                                 <tr key={idx} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                                                                    <td className="py-3 px-4 font-mono text-slate-700">#{String(venta.folio ?? venta.id).slice(-6)}</td>
-                                                                    <td className="py-3 px-4 text-slate-600">{new Date(venta.fecha).toLocaleTimeString()}</td>
+                                                                    <td className="py-3 px-4 font-mono text-slate-700 font-bold">{venta.folio || `#${String(venta.id).slice(-6)}`}</td>
+                                                                    <td className="py-3 px-4 text-slate-600">{new Date(venta.fecha).toLocaleString()}</td>
                                                                     <td className="py-3 px-4 text-right text-slate-700 font-bold">${Number(venta.costo || 0).toFixed(2)}</td>
                                                                     <td className="py-3 px-4 text-right text-slate-800 font-black">${Number(venta.total).toFixed(2)}</td>
                                                                     <td className="py-3 px-4 text-right font-black text-emerald-600">${Number(venta.ganancia).toFixed(2)}</td>
@@ -1028,7 +1124,7 @@ export default function FarmaciaPro() {
                                                                                 setLastSale(ventaPreview);
                                                                                 setMostrarTicketPreview(true);
                                                                             }}
-                                                                            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all"
+                                                                            className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all active:scale-95"
                                                                         >
                                                                             Ver Ticket
                                                                         </button>
@@ -1038,6 +1134,21 @@ export default function FarmaciaPro() {
                                                         })}
                                                     </tbody>
                                                     <tfoot className="border-t-2 border-slate-200 bg-slate-50">
+                                                        <tr className="text-slate-800 font-black">
+                                                            <td className="py-4 px-4" colSpan={2}>TOTAL PERIODO</td>
+                                                            <td className="py-4 px-4 text-right">${costoTotalReporte.toFixed(2)}</td>
+                                                            <td className="py-4 px-4 text-right">${totalFacturadoReporte.toFixed(2)}</td>
+                                                            <td className="py-4 px-4 text-right text-emerald-600">${gananciaReporte.toFixed(2)}</td>
+                                                            <td className={`py-4 px-4 text-right ${porcentajeGananciaReporte > 50 ? 'text-emerald-600' : porcentajeGananciaReporte > 30 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                                {porcentajeGananciaReporte.toFixed(1)}%
+                                                            </td>
+                                                            <td className="py-4 px-4 text-center">{ventasFiltradasReporte.length}</td>
+                                                            <td className="py-4 px-4 text-center">-</td>
+                                                        </tr>
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        )}
                                                         <tr className="text-slate-800 font-black">
                                                             <td className="py-4 px-4" colSpan={2}>TOTAL</td>
                                                             <td className="py-4 px-4 text-right">${costoTotalHoy.toFixed(2)}</td>
