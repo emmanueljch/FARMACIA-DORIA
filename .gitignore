@@ -18,6 +18,7 @@ build/
 # Environment & logs
 .env
 .env.local
+firebase-service-account.json
 *.log
 
 # IDE & OS

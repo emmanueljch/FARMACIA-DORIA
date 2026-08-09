@@ -724,7 +724,27 @@ export default function FarmaciaPro() {
                             };
 
                             try {
+                                const productosBajoStock = carrito.map((item) => {
+                                    const productoActual = productos.find((p) => String(p.id) === String(item.id));
+                                    const stockAnterior = Number(productoActual?.stock ?? item.stock ?? 0);
+                                    const nuevoStock = stockAnterior - Number(item.cantidad || 0);
+                                    return {
+                                        id: item.id,
+                                        nombre: item.nombre ?? productoActual?.nombre ?? 'Producto',
+                                        stock: nuevoStock,
+                                    };
+                                }).filter((p) => p.stock <= 5);
+
                                 await actualizarStockTrasVenta(carrito);
+
+                                if (productosBajoStock.length > 0) {
+                                    fetch('/api/notificar-stock-bajo', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ items: productosBajoStock }),
+                                    }).catch((err) => console.error('Error enviando notificaciones FCM:', err));
+                                }
+
                                 const ventaGuardada = await registrarVentaEnSupabase(ventaBase, carrito);
                                 const ventaPersistida = {
                                     ...ventaGuardada,
