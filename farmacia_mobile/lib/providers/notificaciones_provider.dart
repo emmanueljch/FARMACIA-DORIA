@@ -111,6 +111,7 @@ class NotificacionesProvider extends ChangeNotifier {
   }
 
   Future<void> mostrarAlertaStockBajo({
+    required int idProducto,
     required String nombreProducto,
     required int stockActual,
   }) async {
@@ -129,7 +130,7 @@ class NotificacionesProvider extends ChangeNotifier {
         NotificationDetails(android: androidDetails);
 
     await _localNotifications.show(
-      id: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      id: idProducto,
       title: '⚠️ ¡ALERTA DE STOCK BAJO!',
       body: 'El producto "$nombreProducto" tiene solo $stockActual piezas disponibles.',
       notificationDetails: platformDetails,
