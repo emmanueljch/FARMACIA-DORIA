@@ -65,7 +65,16 @@ class InventarioProvider extends ChangeNotifier {
     for (final p in _allProductos) {
       if (_previousStock.containsKey(p.id)) {
         final oldStock = _previousStock[p.id]!;
+        // Notificar si el producto cruza el umbral de 5 piezas o si el stock siguió disminuyendo
         if (p.existencia <= 5 && (oldStock > 5 || p.existencia < oldStock)) {
+          notificacionesProvider?.mostrarAlertaStockBajo(
+            nombreProducto: p.nombre,
+            stockActual: p.existencia,
+          );
+        }
+      } else {
+        // Al iniciar la app por primera vez, si un producto ya está en stock bajo (<= 5)
+        if (p.existencia <= 5) {
           notificacionesProvider?.mostrarAlertaStockBajo(
             nombreProducto: p.nombre,
             stockActual: p.existencia,
