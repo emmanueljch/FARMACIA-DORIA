@@ -128,8 +128,6 @@ export default function FarmaciaPro() {
             folio,
             vendedor_id: sessionActual?.userId ?? null,
             total: Number(venta.total || 0),
-            ganancia: Number(venta.ganancia || 0),
-            costo: Number(venta.costo || 0),
             metodo_pago: venta.metodo_pago ?? 'Efectivo',
             fecha: venta.fecha,
         };
