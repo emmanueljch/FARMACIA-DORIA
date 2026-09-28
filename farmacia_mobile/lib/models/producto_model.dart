@@ -6,6 +6,8 @@ class Producto {
   final double precio; // Costo del producto
   final double precioConImpuesto; // Precio de venta final
   final int stock;
+  final String clasificacion;
+  final DateTime? fechaCaducidad;
 
   Producto(
       {required this.id,
@@ -14,15 +16,21 @@ class Producto {
       required this.existencia,
       required this.precio,
       required this.precioConImpuesto,
-      required this.stock});
+      required this.stock,
+      this.clasificacion = 'General',
+      this.fechaCaducidad});
 
   factory Producto.fromMap(Map<String, dynamic> map) {
-    // Priorizar la columna 'stock' si existe en la respuesta de Supabase,
-    // y si no, caer back a 'existencia' para compatibilidad.
     final dynamic rawStock = map['stock'] ?? map['existencia'] ?? 0;
     final int stockVal = rawStock is num
         ? rawStock.toInt()
         : int.tryParse(rawStock.toString()) ?? 0;
+
+    final rawCaducidad = map['fecha_caducidad'];
+    DateTime? parsedCaducidad;
+    if (rawCaducidad != null && rawCaducidad.toString().trim().isNotEmpty) {
+      parsedCaducidad = DateTime.tryParse(rawCaducidad.toString().trim());
+    }
 
     return Producto(
       id: map['id'],
@@ -33,7 +41,24 @@ class Producto {
       precioConImpuesto:
           (map['precio_con_impuesto'] ?? 0).toDouble(), // Precio de venta
       stock: stockVal,
+      clasificacion: map['clasificacion'] ?? 'General',
+      fechaCaducidad: parsedCaducidad,
     );
+  }
+
+  // Verificar si está próximo a vencer en los próximos X días (default 30)
+  bool estaProximoACaducar({int diasLimite = 30}) {
+    if (fechaCaducidad == null) return false;
+    final hoy = DateTime.now();
+    final limite = hoy.add(Duration(days: diasLimite));
+    return fechaCaducidad!.isBefore(limite);
+  }
+
+  // Verificar si ya está caducado
+  bool get estaCaducado {
+    if (fechaCaducidad == null) return false;
+    final hoy = DateTime.now();
+    return fechaCaducidad!.isBefore(DateTime(hoy.year, hoy.month, hoy.day));
   }
 
   // Calcular porcentaje de ganancia

@@ -30,7 +30,10 @@ export default function FarmaciaPro() {
     const [formRefVal, setFormRefVal] = useState('');
     const [formNombre, setFormNombre] = useState('');
     const [formPrecio, setFormPrecio] = useState<string>('0');
+    const [formCosto, setFormCosto] = useState<string>('0');
     const [formStock, setFormStock] = useState<string>('0');
+    const [formClasificacion, setFormClasificacion] = useState<string>('General');
+    const [formFechaCaducidad, setFormFechaCaducidad] = useState<string>('');
     // Carga masiva CSV
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [cargaMasivaCargando, setCargaMasivaCargando] = useState(false);
@@ -374,12 +377,33 @@ export default function FarmaciaPro() {
         />
     );
 
+    const descargarPlantillaCSV = () => {
+        const headers = "ref,nombre,clasificacion,precio_compra,precio_venta,stock,fecha_caducidad";
+        const rows = [
+            "REF-001,Paracetamol 500mg,Analgésicos,15.50,25.00,50,2026-12-31",
+            "REF-002,Amoxicilina 500mg,Antibióticos,45.00,70.00,30,2026-11-15",
+            "REF-003,Ibuprofeno 400mg,Antiinflamatorios,20.00,35.00,40,2027-01-20",
+            "REF-004,Gasa Esteril 10x10,Material de Curación,8.00,15.00,100,2028-05-10"
+        ];
+        const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", "plantilla_inventario_ejemplo.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const openNewProductForm = () => {
         setEditingId(null);
         setFormRefVal('');
         setFormNombre('');
         setFormPrecio('0');
+        setFormCosto('0');
         setFormStock('0');
+        setFormClasificacion('General');
+        setFormFechaCaducidad('');
         setShowForm(true);
     };
 
@@ -388,19 +412,35 @@ export default function FarmaciaPro() {
         setFormRefVal(p.ref ?? '');
         setFormNombre(p.nombre ?? '');
         setFormPrecio(String(p.precio_con_impuesto ?? p.precio ?? 0));
+        setFormCosto(String(p.precio ?? 0));
         setFormStock(String(p.stock ?? 0));
+        setFormClasificacion(p.clasificacion ?? 'General');
+        setFormFechaCaducidad(p.fecha_caducidad ?? '');
         setShowForm(true);
     };
 
     const saveProduct = async () => {
-        const precio = parseFloat((formPrecio || '0').toString().replace(/[^0-9.\-]/g, '')) || 0;
+        const precioVenta = parseFloat((formPrecio || '0').toString().replace(/[^0-9.\-]/g, '')) || 0;
+        const precioCompra = parseFloat((formCosto || '0').toString().replace(/[^0-9.\-]/g, '')) || 0;
         const stock = parseInt((formStock || '0').toString().replace(/[^0-9\-]/g, '')) || 0;
+        const clasificacion = formClasificacion.trim() || 'General';
+        const fechaCaducidad = formFechaCaducidad || null;
+
+        const payload = {
+            ref: formRefVal,
+            nombre: formNombre,
+            precio: precioCompra,
+            precio_con_impuesto: precioVenta,
+            stock,
+            clasificacion,
+            fecha_caducidad: fechaCaducidad
+        };
 
         try {
             if (editingId == null) {
                 const { data, error } = await (supabase as any)
                     .from('productos')
-                    .insert({ ref: formRefVal, nombre: formNombre, precio_con_impuesto: precio, stock })
+                    .insert(payload)
                     .select()
                     .single();
                 if (error) throw error;
@@ -408,7 +448,7 @@ export default function FarmaciaPro() {
             } else {
                 const { data, error } = await (supabase as any)
                     .from('productos')
-                    .update({ ref: formRefVal, nombre: formNombre, precio_con_impuesto: precio, stock })
+                    .update(payload)
                     .eq('id', editingId)
                     .select()
                     .single();
@@ -434,7 +474,7 @@ export default function FarmaciaPro() {
             }
 
             const firstCols = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const hasHeader = firstCols.some(h => ['ref', 'nombre', 'precio', 'stock'].some(k => h.includes(k)));
+            const hasHeader = firstCols.some(h => ['ref', 'nombre', 'precio', 'stock', 'clasificacion', 'caducidad'].some(k => h.includes(k)));
             const header = hasHeader ? firstCols : [];
             const rows = hasHeader ? lines.slice(1) : lines;
 
@@ -445,16 +485,27 @@ export default function FarmaciaPro() {
                         const idx = header.findIndex(h => h.includes(key));
                         return idx >= 0 ? (cols[idx] ?? '') : '';
                     }
-                    const mapIdx: any = { ref: 0, nombre: 1, precio: 2, stock: 3 };
+                    const mapIdx: any = { ref: 0, nombre: 1, clasificacion: 2, precio_compra: 3, precio_venta: 4, stock: 5, fecha_caducidad: 6 };
                     return cols[mapIdx[key]] ?? '';
                 };
 
-                const ref = getVal('ref');
+                const ref = getVal('ref') || getVal('codigo');
                 const nombre = getVal('nombre');
-                const precio = parseFloat((getVal('precio') || '0').replace(/[^0-9.\-]/g, '')) || 0;
-                const stock = parseInt((getVal('stock') || '0').replace(/[^0-9\-]/g, '')) || 0;
+                const clasificacion = getVal('clasificacion') || getVal('categoria') || 'General';
+                const precioCompra = parseFloat((getVal('precio_compra') || getVal('costo') || getVal('precio') || '0').replace(/[^0-9.\-]/g, '')) || 0;
+                const precioVenta = parseFloat((getVal('precio_venta') || getVal('precio_con_impuesto') || getVal('venta') || '0').replace(/[^0-9.\-]/g, '')) || 0;
+                const stock = parseInt((getVal('stock') || getVal('existencia') || '0').replace(/[^0-9\-]/g, '')) || 0;
+                const fechaCaducidad = getVal('fecha_caducidad') || getVal('caducidad') || getVal('vencimiento') || null;
 
-                return { ref, nombre, precio_con_impuesto: precio, stock };
+                return {
+                    ref,
+                    nombre,
+                    clasificacion,
+                    precio: precioCompra,
+                    precio_con_impuesto: precioVenta > 0 ? precioVenta : precioCompra,
+                    stock,
+                    fecha_caducidad: fechaCaducidad && fechaCaducidad.trim() ? fechaCaducidad.trim() : null
+                };
             }).filter(r => (r.nombre || r.ref));
 
             if (records.length === 0) {
@@ -472,7 +523,6 @@ export default function FarmaciaPro() {
             // Actualizar estado local de productos
             const inserted = data ?? [];
             setProductos(prev => {
-                // Remover aquellos con misma ref y añadir los insertados
                 const filtered = prev.filter(p => !inserted.some((ins: any) => ins.ref === p.ref));
                 return [...filtered, ...inserted].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
             });
@@ -574,8 +624,8 @@ export default function FarmaciaPro() {
                             <div className="w-full h-24 bg-white/10 rounded-3xl mb-4 flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">
                                 💊
                             </div>
-                            <h3 className="font-bold text-white uppercase text-sm leading-tight min-h-[2.5rem] mb-2">{p.nombre}</h3>
-                            <p className="text-[10px] text-white/80 mb-2">Genérico</p>
+                            <h3 className="font-bold text-white uppercase text-sm leading-tight min-h-[2.5rem] mb-1">{p.nombre}</h3>
+                            <p className="text-[10px] font-semibold text-emerald-200 uppercase tracking-wide mb-2">{p.clasificacion || 'General'}</p>
                             <div className="space-y-1 mb-2 text-[10px]">
                                 <div className="flex justify-between">
                                     <span className="text-white/70">Costo:</span>
@@ -585,6 +635,12 @@ export default function FarmaciaPro() {
                                     <span className="text-white/70">Venta:</span>
                                     <span className="font-bold text-white">${Number(p.precio_con_impuesto).toFixed(2)}</span>
                                 </div>
+                                {p.fecha_caducidad && (
+                                    <div className="flex justify-between">
+                                        <span className="text-white/70">Caduca:</span>
+                                        <span className="font-bold text-yellow-300">{p.fecha_caducidad}</span>
+                                    </div>
+                                )}
                             </div>
                             <div className="flex justify-between items-end">
                                 <div>
@@ -810,27 +866,36 @@ export default function FarmaciaPro() {
                 {!cargando && (
                     <table className="w-full text-left border-collapse">
                         <thead>
-                                <tr className="text-slate-400 text-xs uppercase tracking-widest border-b">
+                            <tr className="text-slate-400 text-xs uppercase tracking-widest border-b">
                                 <th className="p-4">Ref / Código</th>
                                 <th className="p-4">Medicamento</th>
+                                <th className="p-4">Clasificación</th>
                                 <th className="p-4">Stock</th>
-                                <th className="p-4">Precio Final</th>
+                                <th className="p-4">Costo (Compra)</th>
+                                <th className="p-4">P. Venta</th>
+                                <th className="p-4">Caducidad</th>
                                 <th className="p-4">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {productosFiltrados.map(p => (
-                                <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
-                                    <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
-                                    <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
-                                    <td className="p-4 font-black">${Number(p.precio_con_impuesto).toFixed(2)}</td>
-                                    <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
-                                </tr>
-                            ))}
+                            {productosFiltrados.map(p => {
+                                const caducidadStr = p.fecha_caducidad ? p.fecha_caducidad : 'Sin fecha';
+                                return (
+                                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="p-4 font-mono text-xs text-slate-500">{p.ref}</td>
+                                        <td className="p-4 font-bold text-slate-700">{p.nombre}</td>
+                                        <td className="p-4 text-xs font-bold text-slate-500">{p.clasificacion || 'General'}</td>
+                                        <td className={`p-4 font-bold ${Number(p.stock || 0) < 10 ? 'text-red-500' : 'text-emerald-600'}`}>{p.stock || 0} pzas</td>
+                                        <td className="p-4 font-bold text-slate-500">${Number(p.precio || 0).toFixed(2)}</td>
+                                        <td className="p-4 font-black text-emerald-600">${Number(p.precio_con_impuesto || 0).toFixed(2)}</td>
+                                        <td className="p-4 text-xs font-bold text-slate-600">{caducidadStr}</td>
+                                        <td className="p-4 text-slate-400 cursor-pointer hover:text-blue-500 font-bold text-xs" onClick={() => openEditProductForm(p)}>✏️ Editar</td>
+                                    </tr>
+                                );
+                            })}
                             {productosFiltrados.length === 0 && busqueda.trim() && (
                                 <tr>
-                                    <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
+                                    <td colSpan={8} className="p-8 text-center text-slate-400 text-sm">
                                         Sin resultados para <strong>"{busqueda}"</strong>
                                     </td>
                                 </tr>
@@ -901,8 +966,21 @@ export default function FarmaciaPro() {
                     {vistaActual === "Carga Masiva" && (
                         <div className="flex-1 flex items-center justify-center">
                             <div className="w-full max-w-2xl p-8 bg-white rounded-[2rem] shadow-sm border border-slate-100">
-                                <h3 className="text-xl font-black mb-4">Carga Masiva CSV</h3>
-                                <p className="text-sm text-slate-500 mb-4">Sube un archivo CSV con columnas: <span className="font-mono">ref,nombre,precio,stock</span>. Si el CSV tiene cabecera, se detectará automáticamente.</p>
+                                <h3 className="text-xl font-black mb-2">Carga Masiva CSV</h3>
+                                <p className="text-sm text-slate-500 mb-4">Sube un archivo CSV con las columnas: <span className="font-mono font-bold">ref,nombre,clasificacion,precio_compra,precio_venta,stock,fecha_caducidad</span>.</p>
+
+                                <div className="mb-6 p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-black text-emerald-900">¿Dudas con el formato del archivo?</p>
+                                        <p className="text-[11px] text-emerald-700">Descarga nuestra plantilla de ejemplo lista para llenar.</p>
+                                    </div>
+                                    <button
+                                        onClick={descargarPlantillaCSV}
+                                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center gap-2"
+                                    >
+                                        📥 Descargar Plantilla CSV
+                                    </button>
+                                </div>
 
                                 <input
                                     ref={(el) => { fileInputRef.current = el }}
@@ -914,7 +992,6 @@ export default function FarmaciaPro() {
                                         if (f) {
                                             await handleFileSelected(f);
                                         }
-                                        // limpiar para permitir subir el mismo archivo otra vez
                                         (e.target as HTMLInputElement).value = '';
                                     }}
                                 />
@@ -922,7 +999,7 @@ export default function FarmaciaPro() {
                                 <div className="flex items-center gap-3">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-emerald-700 transition-all"
+                                        className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:bg-slate-800 transition-all"
                                     >
                                         Subir CSV
                                     </button>
@@ -1250,21 +1327,35 @@ export default function FarmaciaPro() {
                         <h3 className="text-xl font-black mb-4">{editingId == null ? 'Nuevo Producto' : 'Editar Producto'}</h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-slate-500">Ref / EAN</label>
+                                <label className="text-xs text-slate-500 font-bold">Ref / Código EAN</label>
                                 <input value={formRefVal} onChange={(e) => setFormRefVal(e.target.value)} className="w-full border rounded p-2 mt-1" />
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500">Nombre</label>
+                                <label className="text-xs text-slate-500 font-bold">Nombre del Producto</label>
                                 <input value={formNombre} onChange={(e) => setFormNombre(e.target.value)} className="w-full border rounded p-2 mt-1" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-slate-500 font-bold">Clasificación / Categoría</label>
+                                <input value={formClasificacion} placeholder="Ej: Analgésicos, Antibióticos" onChange={(e) => setFormClasificacion(e.target.value)} className="w-full border rounded p-2 mt-1" />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs text-slate-500">Precio Final</label>
-                                    <input value={formPrecio} onChange={(e) => setFormPrecio(e.target.value)} className="w-full border rounded p-2 mt-1" />
+                                    <label className="text-xs text-slate-500 font-bold">Precio Compra (Costo)</label>
+                                    <input value={formCosto} onChange={(e) => setFormCosto(e.target.value)} className="w-full border rounded p-2 mt-1" />
                                 </div>
                                 <div>
-                                    <label className="text-xs text-slate-500">Stock</label>
+                                    <label className="text-xs text-slate-500 font-bold">Precio Venta (Final)</label>
+                                    <input value={formPrecio} onChange={(e) => setFormPrecio(e.target.value)} className="w-full border rounded p-2 mt-1" />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold">Stock Inicial</label>
                                     <input value={formStock} onChange={(e) => setFormStock(e.target.value)} className="w-full border rounded p-2 mt-1" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 font-bold">Fecha de Caducidad</label>
+                                    <input type="date" value={formFechaCaducidad} onChange={(e) => setFormFechaCaducidad(e.target.value)} className="w-full border rounded p-2 mt-1" />
                                 </div>
                             </div>
                         </div>

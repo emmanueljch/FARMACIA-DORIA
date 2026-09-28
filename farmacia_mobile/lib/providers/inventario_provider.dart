@@ -87,8 +87,26 @@ class InventarioProvider extends ChangeNotifier {
     }
   }
 
+  void _verificarAlertasCaducidad() {
+    for (final p in _allProductos) {
+      if (p.fechaCaducidad != null) {
+        if (p.estaCaducado || p.estaProximoACaducar(diasLimite: 30)) {
+          final fechaStr =
+              '${p.fechaCaducidad!.day.toString().padLeft(2, '0')}/${p.fechaCaducidad!.month.toString().padLeft(2, '0')}/${p.fechaCaducidad!.year}';
+          notificacionesProvider?.mostrarAlertaCaducidad(
+            idProducto: p.id,
+            nombreProducto: p.nombre,
+            fechaCaducidadStr: fechaStr,
+            estaCaducado: p.estaCaducado,
+          );
+        }
+      }
+    }
+  }
+
   void _syncEstadoLocal() {
     _verificarAlertasStock();
+    _verificarAlertasCaducidad();
 
     // 1. Actualizar el producto escaneado si existe para reflejar el stock nuevo
     if (productoEscaneado != null) {

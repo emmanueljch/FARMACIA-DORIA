@@ -136,4 +136,37 @@ class NotificacionesProvider extends ChangeNotifier {
       notificationDetails: platformDetails,
     );
   }
+
+  Future<void> mostrarAlertaCaducidad({
+    required int idProducto,
+    required String nombreProducto,
+    required String fechaCaducidadStr,
+    required bool estaCaducado,
+  }) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+      'alertas_caducidad',
+      'Alertas de Caducidad',
+      channelDescription: 'Canal para notificar caducidad próxima de medicamentos',
+      importance: Importance.max,
+      priority: Priority.high,
+      ticker: 'ticker',
+      icon: '@mipmap/ic_launcher',
+    );
+
+    const NotificationDetails platformDetails =
+        NotificationDetails(android: androidDetails);
+
+    final String title = estaCaducado ? '⛔ ¡PRODUCTO CADUCADO!' : '⏳ ¡ALERTA DE CADUCIDAD PRÓXIMA!';
+    final String body = estaCaducado
+        ? 'El producto "$nombreProducto" caducó el $fechaCaducidadStr.'
+        : 'El producto "$nombreProducto" vence el $fechaCaducidadStr.';
+
+    await _localNotifications.show(
+      id: idProducto + 50000,
+      title: title,
+      body: body,
+      notificationDetails: platformDetails,
+    );
+  }
 }

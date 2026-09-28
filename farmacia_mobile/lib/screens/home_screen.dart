@@ -259,17 +259,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       fontSize: 14),
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                Text("REF: ${p.ref}",
-                                    style: TextStyle(
-                                        color: Colors.grey.shade400,
-                                        fontSize: 10)),
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF1F5F9),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        p.clasificacion.toUpperCase(),
+                                        style: const TextStyle(
+                                            color: Color(0xFF334155),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 9),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text("REF: ${p.ref}",
+                                        style: TextStyle(
+                                            color: Colors.grey.shade400,
+                                            fontSize: 10)),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
                                 Text(
-                                  "\$${p.precioConImpuesto.toStringAsFixed(2)}",
+                                  "Costo: \$${p.precio.toStringAsFixed(2)} | Venta: \$${p.precioConImpuesto.toStringAsFixed(2)}",
                                   style: const TextStyle(
                                       color: Color(0xFF059669),
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 18),
+                                      fontSize: 12),
                                 ),
+                                if (p.fechaCaducidad != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    p.estaCaducado
+                                        ? "⛔ CADUCADO (${p.fechaCaducidad!.day.toString().padLeft(2, '0')}/${p.fechaCaducidad!.month.toString().padLeft(2, '0')}/${p.fechaCaducidad!.year})"
+                                        : p.estaProximoACaducar(diasLimite: 30)
+                                            ? "⏳ Caduca pronto: ${p.fechaCaducidad!.day.toString().padLeft(2, '0')}/${p.fechaCaducidad!.month.toString().padLeft(2, '0')}/${p.fechaCaducidad!.year}"
+                                            : "Caduca: ${p.fechaCaducidad!.day.toString().padLeft(2, '0')}/${p.fechaCaducidad!.month.toString().padLeft(2, '0')}/${p.fechaCaducidad!.year}",
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: p.estaCaducado
+                                          ? Colors.red
+                                          : p.estaProximoACaducar(diasLimite: 30)
+                                              ? Colors.amber.shade800
+                                              : Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
